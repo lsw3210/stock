@@ -41,7 +41,8 @@ def analyze_stock(ticker):
 
         info = stock_obj.info
         name = info.get('longName') or info.get('shortName') or ticker
-        curr_price = hist['Close'].iloc[-1]
+        # 정규장 종가가 아닌, 현재 시점(장전/장후 포함)의 가장 최신 가격을 가져옴
+        curr_price = today_hist['Close'].iloc[-1]
         prev_close = hist['Close'].iloc[-2] if len(hist) > 1 else curr_price
         change = ((curr_price - prev_close) / prev_close) * 100 if prev_close != 0 else 0
         
@@ -132,7 +133,7 @@ if 'analysis_results' in st.session_state and st.session_state['analysis_results
     df = pd.DataFrame(results)
     display_df = df.drop(columns=['chart_series'])
 
-    st.info("💡 표에서 종목 왼쪽 체크를 클릭하면 상세 차트가 팝업됩니다.")
+    st.info("💡 종목 왼쪽 체크를 클릭하면 상세 차트가 팝업됩니다.")
 
     # 표 출력 및 선택 이벤트 감지
     selection = st.dataframe(
