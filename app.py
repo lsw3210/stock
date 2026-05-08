@@ -65,9 +65,9 @@ def analyze_stock(ticker):
             "종목명": name, 
             "현재가": curr_price,
             "등락률": round(change, 2), 
-            "신호": "매수", 
-            "강도": 3, 
-            "이유": "분석 완료",
+            "신호": "매수" if score >= 0 else "매도",
+            "강도": abs(score),
+            "이유": ", ".join(reasons) if reasons else "보통",
             "chart_series": today_hist['Close'] 
         }
     except: return None
