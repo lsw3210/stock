@@ -18,8 +18,10 @@ st.set_page_config(page_title="AI 주식 분석 시스템", layout="wide")
 
 def load_settings():
     if os.path.exists(CONFIG_FILE):
-        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
+        try:
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except: pass
     return DEFAULT_TICKERS
 
 def save_settings(tickers):
@@ -30,10 +32,12 @@ def save_settings(tickers):
 def analyze_stock(ticker):
     try:
         stock_obj = yf.Ticker(ticker)
-        # 장전/후 포함 데이터
+        # 장전/후 포함 5분 단위 데이터
         today_hist = stock_obj.history(period="1d", interval="5m", prepost=True)
+        # 기술적 지표용 1개월 데이터
         hist = stock_obj.history(period="1mo")
-        if today_hist.empty or len(hist) < 2: return None
+        
+        if today_hist.empty or len(hist) < 20: return None
 
         info = stock_obj.info
         name = info.get('longName') or info.get('shortName') or ticker
@@ -41,37 +45,30 @@ def analyze_stock(ticker):
         prev_close = hist['Close'].iloc[-2]
         change = ((curr_price - prev_close) / prev_close) * 100
         
-        # 기술적 지표
-        delta = hist['Close'].diff()
-        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
-        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
-        
-        rs = gain.iloc[-1] / loss.iloc[-1] if loss.iloc[-1] != 0 else 0
-        rsi = 100 - (100 / (1 + rs))
+        # 간단한 기술적 지표 계산
         ma5 = hist['Close'].rolling(5).mean().iloc[-1]
-        ma20 = hist['Close'].rolling(window=20).mean().iloc[-1]
-
-        score = 0
+        ma20 = hist['Close'].rolling(20).mean().iloc[-1]
+        
+        score = 1 # 기본 점수
         reasons = []
-        if rsi < 30: score += 3; reasons.append("RSI 과매도")
-        elif rsi > 70: score -= 3; reasons.append("RSI 과매수")
         if curr_price > ma5: score += 1; reasons.append("5일선 위")
-        if ma5 > ma20: score += 1; reasons.append("정배열")
+        if ma5 > ma20: score += 1; reasons.append("단기 이평 정배열")
 
-        # 포맷팅
+        # 가격 포맷팅
         price_fmt = f"{int(curr_price):,}원" if ".KS" in ticker else f"${curr_price:,.2f}"
         
         return {
-            "티커": ticker, 
-            "종목명": name, 
+            "티커": ticker,
+            "종목명": name,
             "현재가": price_fmt,
-            "등락률": round(change, 2), 
-            "신호": "매수" if score >= 0 else "매도",
+            "등락률": round(change, 2),
+            "신호": "매수" if score >= 2 else "매도",
             "강도": score,
             "이유": ", ".join(reasons) if reasons else "보통",
             "chart_series": today_hist['Close'] 
         }
-    except: return None
+    except Exception as e:
+        return None
 
 # --- UI 구성 ---
 st.title("📊 AI 주식 분석 시스템")
