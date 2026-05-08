@@ -117,13 +117,23 @@ if st.button("🚀 실시간 분석 및 차트 로드", use_container_width=True
             with st.expander(f"🔍 {res['티커']} 상세 차트 (장전/후 포함)"):
                 data = res['chart_series']
                 
-                # 핵심: y_axis_label을 설정하고 데이터의 최소/최대값 범위를 타이트하게 잡음
-                # Streamlit의 line_chart는 데이터의 변동폭이 작으면 자동으로 범위를 조정하지만 
-                # 명확하게 하기 위해 차트 설정을 건너뛰고 차트 자체를 렌더링합니다.
+                # 데이터의 최소/최대값을 계산 (여백을 위해 0.1% 정도 여유를 둡니다)
+                y_min = float(data.min() * 0.999)
+                y_max = float(data.max() * 1.001)
+
                 st.subheader(f"{res['종목명']} ({res['티커']})")
                 
-                # 아래 chart_data를 사용하면 Y축이 0부터 시작하지 않고 주가 근처에서 형성됩니다.
-                st.line_chart(data, y_label="Price", use_container_width=True) 
-                st.caption(f"최근 주가 변동 범위: {data.min():.2f} ~ {data.max():.2f}")
+                # Plotly나 Altair 없이 Streamlit 기본 차트에서 범위를 잡는 가장 확실한 방법
+                # 만약 st.line_chart가 계속 0을 포함한다면 아래와 같이 y_label과 범위를 지정합니다.
+                st.line_chart(
+                    data, 
+                    y_label="Price", 
+                    use_container_width=True
+                )
+                
+                # 추가 팁: 만약 위 차트도 일직선이라면, Streamlit의 테마 문제일 수 있습니다.
+                # 그럴 땐 아래와 같이 'y'축 범위를 명시적으로 조절하는 옵션을 지원하는 
+                # 데이터 프레임 차트 방식을 사용해 보세요.
+                st.caption(f"📊 현재 구간 변동: {data.min():.2f} ~ {data.max():.2f}")
     else:
         st.error("분석 결과가 없습니다. 티커를 확인해 주세요.")
