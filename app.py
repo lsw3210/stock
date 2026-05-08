@@ -32,29 +32,30 @@ def save_settings(tickers):
 def analyze_stock(ticker):
     try:
         stock_obj = yf.Ticker(ticker)
-        # 장전/후 포함 5분 단위 데이터
         today_hist = stock_obj.history(period="1d", interval="5m", prepost=True)
-        # 기술적 지표용 1개월 데이터
         hist = stock_obj.history(period="1mo")
         
-        if today_hist.empty or len(hist) < 20: return None
+        # 조건 완화: 데이터가 하나라도 있으면 일단 분석하도록 수정
+        if today_hist.empty or len(hist) < 2: 
+            return None
 
         info = stock_obj.info
         name = info.get('longName') or info.get('shortName') or ticker
+        
+        # 데이터가 20개가 안 될 경우를 대비한 안전한 인덱싱
         curr_price = hist['Close'].iloc[-1]
-        prev_close = hist['Close'].iloc[-2]
-        change = ((curr_price - prev_close) / prev_close) * 100
+        prev_close = hist['Close'].iloc[-2] if len(hist) > 1 else curr_price
+        change = ((curr_price - prev_close) / prev_close) * 100 if prev_close != 0 else 0
         
-        # 간단한 기술적 지표 계산
-        ma5 = hist['Close'].rolling(5).mean().iloc[-1]
-        ma20 = hist['Close'].rolling(20).mean().iloc[-1]
+        # 지표 계산 시 데이터 개수 체크
+        ma5 = hist['Close'].rolling(5).mean().iloc[-1] if len(hist) >= 5 else curr_price
+        ma20 = hist['Close'].rolling(20).mean().iloc[-1] if len(hist) >= 20 else curr_price
         
-        score = 1 # 기본 점수
+        score = 1
         reasons = []
         if curr_price > ma5: score += 1; reasons.append("5일선 위")
         if ma5 > ma20: score += 1; reasons.append("단기 이평 정배열")
 
-        # 가격 포맷팅
         price_fmt = f"{int(curr_price):,}원" if ".KS" in ticker else f"${curr_price:,.2f}"
         
         return {
@@ -64,10 +65,12 @@ def analyze_stock(ticker):
             "등락률": round(change, 2),
             "신호": "매수" if score >= 2 else "매도",
             "강도": score,
-            "이유": ", ".join(reasons) if reasons else "보통",
+            "이유": ", ".join(reasons) if reasons else "데이터 부족/보통",
             "chart_series": today_hist['Close'] 
         }
     except Exception as e:
+        # 로그에 에러를 찍어서 관리자 모드에서 볼 수 있게 함
+        print(f"Error analyzing {ticker}: {e}")
         return None
 
 # --- UI 구성 ---
@@ -122,17 +125,14 @@ if st.button("🚀 실시간 분석 및 차트 로드", use_container_width=True
         # 2. 하단 상세 차트 (Plotly로 Y축 최적화)
         for res in results:
             with st.expander(f"🔍 {res['티커']} ({res['종목명']}) 상세 분석 및 차트"):
-                # 차트 데이터 준비
-                data = res['chart_series']
+                # 인덱스에서 시간대 제거 (Plotly 호환성)
+                data = res['chart_series'].copy()
+                data.index = data.index.tz_localize(None) 
                 
-                # Plotly 차트 생성
-                fig = px.line(x=data.index, y=data.values, title=f"{res['티커']} 장전/후 포함 추이")
+                # 차트 생성 시 x, y 명시적 지정
+                fig = px.line(x=data.index, y=data.values, title=f"{res['티커']} 실시간 추이")
                 
-                # Y축 자동 스케일링 (0부터 시작하지 않음)
                 fig.update_yaxes(autorange=True, fixedrange=False, title="Price")
-                fig.update_xaxes(title="Time")
-                
-                # 레이아웃 깔끔하게
                 fig.update_layout(margin=dict(l=10, r=10, t=30, b=10), height=350)
                 
                 st.plotly_chart(fig, use_container_width=True)
