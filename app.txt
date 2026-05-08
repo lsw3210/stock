@@ -72,7 +72,7 @@ def analyze_stock(ticker):
             "등락률": round(change, 2),
             "신호": "매수" if score >= 2 else "매도",
             "강도": score,
-            "이유": ", ".join(reasons) if reasons else "보통",
+            "이유": ", ".join(reasons) if reasons else "데이터 분석 완료",
             "chart_series": today_hist['Close'] 
         }
     except:
