@@ -92,7 +92,7 @@ def show_details(res):
     c3.metric("분석강도", f"{res['강도']}/5")
     
     st.write(f"**💡 분석 결과:** {res['이유']}")
-    if st.button("창 닫기"):
+    if st.button("닫기", use_container_width=True):
         st.rerun()
 
 # --- 4. 메인 UI 구성 ---
