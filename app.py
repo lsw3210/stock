@@ -5,6 +5,7 @@ import yfinance as yf
 import pandas as pd
 import json
 import os
+import plotly.express as px
 
 # --- 설정 및 초기화 ---
 CONFIG_FILE = "stock_config.json"
@@ -117,23 +118,33 @@ if st.button("🚀 실시간 분석 및 차트 로드", use_container_width=True
             with st.expander(f"🔍 {res['티커']} 상세 차트 (장전/후 포함)"):
                 data = res['chart_series']
                 
-                # 데이터의 최소/최대값을 계산 (여백을 위해 0.1% 정도 여유를 둡니다)
-                y_min = float(data.min() * 0.999)
-                y_max = float(data.max() * 1.001)
-
                 st.subheader(f"{res['종목명']} ({res['티커']})")
                 
-                # Plotly나 Altair 없이 Streamlit 기본 차트에서 범위를 잡는 가장 확실한 방법
-                # 만약 st.line_chart가 계속 0을 포함한다면 아래와 같이 y_label과 범위를 지정합니다.
-                st.line_chart(
-                    data, 
-                    y_label="Price", 
-                    use_container_width=True
-                )
+                # 1. Plotly Express 사용
+                import plotly.express as px
                 
-                # 추가 팁: 만약 위 차트도 일직선이라면, Streamlit의 테마 문제일 수 있습니다.
-                # 그럴 땐 아래와 같이 'y'축 범위를 명시적으로 조절하는 옵션을 지원하는 
-                # 데이터 프레임 차트 방식을 사용해 보세요.
+                # 차트 생성 (x축은 시간 인덱스, y축은 종가)
+                fig = px.line(data, y=data.values, x=data.index, 
+                              labels={'x': '시간', 'y': '가격'})
+
+                # 2. 핵심 설정: Y축 범위를 데이터에 맞춰 자동 조절(autorange)
+                # 이 설정이 들어가야 0부터 시작하지 않고 주가 근처에서 움직입니다.
+                fig.update_yaxes(
+                    autorange=True, 
+                    fixedrange=False,
+                    tickformat=",.2f" # 소수점 둘째자리까지 표시
+                )
+
+                # 3. 차트 디자인 살짝 추가 (선 색상 등)
+                fig.update_traces(line_color='#0077ff', line_width=2)
+                fig.update_layout(
+                    margin=dict(l=20, r=20, t=5, b=20), # 여백 줄이기
+                    height=400
+                )
+
+                # 4. Streamlit에 표시
+                st.plotly_chart(fig, use_container_width=True)
+                
                 st.caption(f"📊 현재 구간 변동: {data.min():.2f} ~ {data.max():.2f}")
     else:
         st.error("분석 결과가 없습니다. 티커를 확인해 주세요.")
