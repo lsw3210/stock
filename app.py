@@ -132,7 +132,7 @@ if 'analysis_results' in st.session_state and st.session_state['analysis_results
     df = pd.DataFrame(results)
     display_df = df.drop(columns=['chart_series'])
 
-    st.info("💡 표에서 종목을 클릭하면 상세 차트가 팝업됩니다.")
+    st.info("💡 표에서 종목 왼쪽 체크를 클릭하면 상세 차트가 팝업됩니다.")
 
     # 표 출력 및 선택 이벤트 감지
     selection = st.dataframe(
@@ -141,7 +141,10 @@ if 'analysis_results' in st.session_state and st.session_state['analysis_results
         hide_index=True,
         on_select="rerun",
         selection_mode="single-row",
+        # --- 핵심: 열 고정 및 너비 설정 ---
         column_config={
+            "티커": st.column_config.TextColumn("티커", pinned=True), # 왼쪽 고정
+            "종목명": st.column_config.TextColumn("종목명", width="medium"), 
             "등락률": st.column_config.NumberColumn("등락률(%)", format="%.2f%%"),
             "강도": st.column_config.ProgressColumn("강도", min_value=0, max_value=5),
         }
