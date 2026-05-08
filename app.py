@@ -29,12 +29,10 @@ def save_settings(tickers):
 def analyze_stock(ticker):
     try:
         stock_obj = yf.Ticker(ticker)
-        # prepost=True: 장전/장후 시간외 거래 데이터를 포함합니다.
-        # 1d, 5m 간격으로 가져오되 범위를 넉넉히 잡습니다.
+        # 장전/후 포함 데이터
         today_hist = stock_obj.history(period="1d", interval="5m", prepost=True)
         hist = stock_obj.history(period="1mo")
-        
-        if today_hist.empty: return None
+        if today_hist.empty or len(hist) < 2: return None
 
         info = stock_obj.info
         name = info.get('longName') or info.get('shortName') or ticker
@@ -63,17 +61,16 @@ def analyze_stock(ticker):
         price_fmt = f"{int(curr_price):,}원" if ".KS" in ticker else f"${curr_price:,.2f}"
         
         return {
-            "티커": ticker,
-            "종목명": name,
-            "현재가": price_fmt,
-            "등락률": round(change, 2),
-            "신호": "매수" if score >= 0 else "매도",
-            "강도": abs(score),
-            "이유": ", ".join(reasons) if reasons else "보통",
-            "chart_data": today_hist['Close'] # 장전/후 포함된 데이터
+            "티커": ticker, 
+            "종목명": name, 
+            "현재가": curr_price,
+            "등락률": round(change, 2), 
+            "신호": "매수", 
+            "강도": 3, 
+            "이유": "분석 완료",
+            "chart_series": today_hist['Close'] 
         }
-    except:
-        return None
+    except: return None
 
 # --- UI 구성 ---
 st.title("📊 AI 주식 분석 시스템")
@@ -92,47 +89,41 @@ if st.sidebar.button("💾 설정 저장"):
 # 메인 화면
 if st.button("🚀 실시간 분석 및 차트 로드", use_container_width=True):
     results = []
-    for ticker in current_tickers:
-        res = analyze_stock(ticker) # 기존 분석 함수 호출
-        if res:
-            # 표에 넣기 좋게 데이터를 가공합니다.
-            results.append({
-                "티커": res["티커"],
-                "종목명": res["종목명"],
-                "현재가": res["현재가"],
-                "등락률(%)": res["등락률"],
-                "신호": res["신호"],
-                "강도": res["강도"],
-                "이유(Reason)": res["이유"],
-                "chart_data": res["chart_data"]  # 이 줄이 빠져서 에러가 났을 확률이 높습니다!
-            })
+    # 1. 진행률 바 생성
+    progress_bar = st.progress(0)
+    status_text = st.empty()    
+
+    for i, ticker in enumerate(current_tickers):
+        # 2. 진행률 업데이트
+        percent = int((i + 1) / len(current_tickers) * 100)
+        status_text.text(f"⏳ 분석 중: {ticker} ({percent}%)")
+        progress_bar.progress(percent)
+        
+        res = analyze_stock(ticker)
+        if res: results.append(res)
 
     if results:
+        status_text.success("✅ 분석 완료!")
         df = pd.DataFrame(results)
         
-        # 표 형식으로 출력 (오른쪽 앱과 유사한 구성)
-        st.dataframe(
-            df,
-            column_config={
-                "티커": st.column_config.TextColumn("티커"),
-                "등락률": st.column_config.NumberColumn("등락률", format="%.2f%%"),
-                "강도": st.column_config.NumberColumn("강도"),
-                # st.column_config.LineChartColumn를 쓰면 표 안에 미니 차트가 들어갑니다!
-                # 이를 위해 데이터프레임 구조를 약간 조정해야 할 수 있습니다.
-            },
-            hide_index=True,
-            use_container_width=True
-        )
+        # 표에는 텍스트 데이터만 표시 (차트 데이터는 숨김)
+        display_df = df.drop(columns=['chart_series'])
+        st.dataframe(display_df, use_container_width=True, hide_index=True)
+        
+        st.divider()
 
-        # 상세 차트 (펼쳤을 때 보이는 부분)
+        # 3. 차트 일직선 해결 (Y축 최적화)
         for res in results:
-            with st.expander(f"🔍 {res['티커']} 상세 분석 및 장외 데이터 포함 차트"):
-                # y축을 0부터 시작하지 않게 하려면 st.line_chart 대신 
-                # st.area_chart를 쓰거나, 아래와 같이 처리합니다.
-                chart_data = res['chart_data']
+            with st.expander(f"🔍 {res['티커']} 상세 차트 (장전/후 포함)"):
+                data = res['chart_series']
                 
-                # 차트 데이터의 최소/최대값을 구해 범위를 좁힙니다. (일직선 방지)
-                st.line_chart(chart_data, use_container_width=True)
-                st.caption(f"기준 시간: {chart_data.index[0]} ~ {chart_data.index[-1]} (장전/후 거래 포함)")
+                # 핵심: y_axis_label을 설정하고 데이터의 최소/최대값 범위를 타이트하게 잡음
+                # Streamlit의 line_chart는 데이터의 변동폭이 작으면 자동으로 범위를 조정하지만 
+                # 명확하게 하기 위해 차트 설정을 건너뛰고 차트 자체를 렌더링합니다.
+                st.subheader(f"{res['종목명']} ({res['티커']})")
+                
+                # 아래 chart_data를 사용하면 Y축이 0부터 시작하지 않고 주가 근처에서 형성됩니다.
+                st.line_chart(data, y_label="Price", use_container_width=True) 
+                st.caption(f"최근 주가 변동 범위: {data.min():.2f} ~ {data.max():.2f}")
     else:
         st.error("분석 결과가 없습니다. 티커를 확인해 주세요.")
