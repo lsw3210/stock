@@ -46,14 +46,22 @@ def analyze_stock(ticker):
         prev_close = hist['Close'].iloc[-2] if len(hist) > 1 else curr_price
         change = ((curr_price - prev_close) / prev_close) * 100 if prev_close != 0 else 0
         
-        # 지표 계산
-        ma5 = hist['Close'].rolling(5).mean().iloc[-1] if len(hist) >= 5 else curr_price
-        ma20 = hist['Close'].rolling(20).mean().iloc[-1] if len(hist) >= 20 else curr_price
+        # 기술적 지표
+        delta = hist['Close'].diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
+        
+        rs = gain.iloc[-1] / loss.iloc[-1] if loss.iloc[-1] != 0 else 0
+        rsi = 100 - (100 / (1 + rs))
+        ma5 = hist['Close'].rolling(5).mean().iloc[-1]
+        ma20 = hist['Close'].rolling(window=20).mean().iloc[-1]
         
         score = 1
         reasons = []
+        if rsi < 30: score += 3; reasons.append("RSI 과매도")
+        elif rsi > 70: score -= 3; reasons.append("RSI 과매수")
         if curr_price > ma5: score += 1; reasons.append("5일선 위")
-        if ma5 > ma20: score += 1; reasons.append("단기 이평 정배열")
+        if ma5 > ma20: score += 1; reasons.append("정배열")
 
         price_fmt = f"{int(curr_price):,}원" if ".KS" in ticker else f"${curr_price:,.2f}"
         
