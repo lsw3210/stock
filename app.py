@@ -1,3 +1,5 @@
+# https://hitstock.streamlit.app
+
 import streamlit as st
 import yfinance as yf
 import pandas as pd
@@ -7,26 +9,8 @@ import os
 # --- 설정 및 초기화 ---
 CONFIG_FILE = "stock_config.json"
 DEFAULT_TICKERS = [
-    "BITX",
-    "GOOGL",
-    "INTC",
-    "SNDK",
-    "SOXL",
-    "MSFT",
-    "AAPL",
-    "NVDA",
-    "TSLA",
-    "META",
-    "AMZN",
-    "WDC",
-    "005930.KS",
-    "000660.KS",
-    "035420.KS",
-    "051910.KS",
-    "068270.KS",
-    "105560.KS",
-    "323410.KS",
-    "207940.KS"
+    "BITX", "GOOGL", "INTC", "SNDK", "SOXL", "MSFT", "AAPL", "NVDA", "TSLA", "META", "AMZN", "WDC",
+    "005930.KS", "000660.KS", "035420.KS", "051910.KS", "068270.KS", "105560.KS", "323410.KS", "207940.KS"
 ]
 
 st.set_page_config(page_title="AI 주식 분석 시스템", layout="wide")
@@ -45,10 +29,12 @@ def save_settings(tickers):
 def analyze_stock(ticker):
     try:
         stock_obj = yf.Ticker(ticker)
+        # prepost=True: 장전/장후 시간외 거래 데이터를 포함합니다.
+        # 1d, 5m 간격으로 가져오되 범위를 넉넉히 잡습니다.
+        today_hist = stock_obj.history(period="1d", interval="5m", prepost=True)
         hist = stock_obj.history(period="1mo")
-        today_hist = stock_obj.history(period="1d", interval="5m")
         
-        if hist.empty: return None
+        if today_hist.empty: return None
 
         info = stock_obj.info
         name = info.get('longName') or info.get('shortName') or ticker
@@ -84,7 +70,7 @@ def analyze_stock(ticker):
             "신호": "매수" if score >= 0 else "매도",
             "강도": abs(score),
             "이유": ", ".join(reasons) if reasons else "보통",
-            "chart_data": today_hist['Close']
+            "chart_data": today_hist['Close'] # 장전/후 포함된 데이터
         }
     except:
         return None
@@ -117,32 +103,36 @@ if st.button("🚀 실시간 분석 및 차트 로드", use_container_width=True
                 "등락률(%)": res["등락률"],
                 "신호": res["신호"],
                 "강도": res["강도"],
-                "이유(Reason)": res["이유"]
+                "이유(Reason)": res["이유"],
+                "chart_data": res["chart_data"]  # 이 줄이 빠져서 에러가 났을 확률이 높습니다!
             })
 
     if results:
         df = pd.DataFrame(results)
         
-        # 1. 오른쪽 앱처럼 깔끔한 표로 보여주기
-        # st.dataframe을 쓰면 열 너비 조절과 정렬이 가능합니다.
+        # 표 형식으로 출력 (오른쪽 앱과 유사한 구성)
         st.dataframe(
             df,
             column_config={
-                "등락률(%)": st.column_config.NumberColumn(format="%.2f%%"),
-                "강도": st.column_config.ProgressColumn(min_value=0, max_value=5),
+                "티커": st.column_config.TextColumn("티커"),
+                "등락률": st.column_config.NumberColumn("등락률", format="%.2f%%"),
+                "강도": st.column_config.NumberColumn("강도"),
+                # st.column_config.LineChartColumn를 쓰면 표 안에 미니 차트가 들어갑니다!
+                # 이를 위해 데이터프레임 구조를 약간 조정해야 할 수 있습니다.
             },
             hide_index=True,
             use_container_width=True
         )
 
-        # 2. 차트는 표 아래에 별도로 한 번에 보여주거나, 상세 보기로 유지
-        st.subheader("📈 당일 추이 (1D)")
-        cols = st.columns(3) # 한 줄에 3개씩 차트 배치
-        for i, res in enumerate(results):
-            with cols[i % 3]:
-                # 실제 차트 데이터는 analyze_stock에서 받은 데이터를 사용
-                # res["chart_data"]가 담긴 별도 리스트가 필요할 수 있습니다.
-                st.line_chart(analyze_stock(res["티커"])["chart_data"], height=150)
-                st.caption(f"{res['티커']} 추이")
+        # 상세 차트 (펼쳤을 때 보이는 부분)
+        for res in results:
+            with st.expander(f"🔍 {res['티커']} 상세 분석 및 장외 데이터 포함 차트"):
+                # y축을 0부터 시작하지 않게 하려면 st.line_chart 대신 
+                # st.area_chart를 쓰거나, 아래와 같이 처리합니다.
+                chart_data = res['chart_data']
+                
+                # 차트 데이터의 최소/최대값을 구해 범위를 좁힙니다. (일직선 방지)
+                st.line_chart(chart_data, use_container_width=True)
+                st.caption(f"기준 시간: {chart_data.index[0]} ~ {chart_data.index[-1]} (장전/후 거래 포함)")
     else:
         st.error("분석 결과가 없습니다. 티커를 확인해 주세요.")
