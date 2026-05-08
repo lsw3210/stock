@@ -64,10 +64,10 @@ def analyze_stock(ticker):
         return {
             "티커": ticker, 
             "종목명": name, 
-            "현재가": curr_price,
+            "현재가": price_fmt,
             "등락률": round(change, 2), 
             "신호": "매수" if score >= 0 else "매도",
-            "강도": abs(score),
+            "강도": score,
             "이유": ", ".join(reasons) if reasons else "보통",
             "chart_series": today_hist['Close'] 
         }
@@ -90,61 +90,55 @@ if st.sidebar.button("💾 설정 저장"):
 # 메인 화면
 if st.button("🚀 실시간 분석 및 차트 로드", use_container_width=True):
     results = []
-    # 1. 진행률 바 생성
     progress_bar = st.progress(0)
-    status_text = st.empty()    
+    status_text = st.empty()
 
     for i, ticker in enumerate(current_tickers):
-        # 2. 진행률 업데이트
         percent = int((i + 1) / len(current_tickers) * 100)
         status_text.text(f"⏳ 분석 중: {ticker} ({percent}%)")
         progress_bar.progress(percent)
         
         res = analyze_stock(ticker)
-        if res: results.append(res)
+        if res:
+            results.append(res)
 
     if results:
-        status_text.success("✅ 분석 완료!")
+        status_text.success(f"✅ 총 {len(results)}개 종목 분석 완료!")
+        
+        # 표 출력을 위해 차트 데이터 제외한 데이터프레임 생성
         df = pd.DataFrame(results)
-        
-        # 표에는 텍스트 데이터만 표시 (차트 데이터는 숨김)
         display_df = df.drop(columns=['chart_series'])
-        st.dataframe(display_df, use_container_width=True, hide_index=True)
         
-        st.divider()
+        # 1. 상단 요약 표 (오른쪽 앱 스타일)
+        st.dataframe(
+            display_df,
+            column_config={
+                "등락률": st.column_config.NumberColumn("등락률(%)", format="%.2f%%"),
+                "강도": st.column_config.ProgressColumn("강도", min_value=0, max_value=5),
+            },
+            hide_index=True,
+            use_container_width=True
+        )
 
-        # 3. 차트 일직선 해결 (Y축 최적화)
+        st.markdown("---")
+
+        # 2. 하단 상세 차트 (Plotly로 Y축 최적화)
         for res in results:
-            with st.expander(f"🔍 {res['티커']} 상세 차트 (장전/후 포함)"):
+            with st.expander(f"🔍 {res['티커']} ({res['종목명']}) 상세 분석 및 차트"):
+                # 차트 데이터 준비
                 data = res['chart_series']
                 
-                st.subheader(f"{res['종목명']} ({res['티커']})")
+                # Plotly 차트 생성
+                fig = px.line(x=data.index, y=data.values, title=f"{res['티커']} 장전/후 포함 추이")
                 
-                # 1. Plotly Express 사용
-                import plotly.express as px
+                # Y축 자동 스케일링 (0부터 시작하지 않음)
+                fig.update_yaxes(autorange=True, fixedrange=False, title="Price")
+                fig.update_xaxes(title="Time")
                 
-                # 차트 생성 (x축은 시간 인덱스, y축은 종가)
-                fig = px.line(data, y=data.values, x=data.index, 
-                              labels={'x': '시간', 'y': '가격'})
-
-                # 2. 핵심 설정: Y축 범위를 데이터에 맞춰 자동 조절(autorange)
-                # 이 설정이 들어가야 0부터 시작하지 않고 주가 근처에서 움직입니다.
-                fig.update_yaxes(
-                    autorange=True, 
-                    fixedrange=False,
-                    tickformat=",.2f" # 소수점 둘째자리까지 표시
-                )
-
-                # 3. 차트 디자인 살짝 추가 (선 색상 등)
-                fig.update_traces(line_color='#0077ff', line_width=2)
-                fig.update_layout(
-                    margin=dict(l=20, r=20, t=5, b=20), # 여백 줄이기
-                    height=400
-                )
-
-                # 4. Streamlit에 표시
+                # 레이아웃 깔끔하게
+                fig.update_layout(margin=dict(l=10, r=10, t=30, b=10), height=350)
+                
                 st.plotly_chart(fig, use_container_width=True)
-                
-                st.caption(f"📊 현재 구간 변동: {data.min():.2f} ~ {data.max():.2f}")
+                st.write(f"**현재가:** {res['현재가']} | **신호:** {res['신호']} | **이유:** {res['이유']}")
     else:
         st.error("분석 결과가 없습니다. 티커를 확인해 주세요.")
