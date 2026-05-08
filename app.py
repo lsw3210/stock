@@ -37,29 +37,37 @@ def analyze_stock(ticker):
         # 기술적 지표용 1개월 데이터
         hist = stock_obj.history(period="1mo")
         
-        if today_hist.empty: return None
+        if today_hist.empty or len(hist) < 20: return None
 
         info = stock_obj.info
         name = info.get('longName') or info.get('shortName') or ticker
-        # 정규장 종가가 아닌, 현재 시점(장전/장후 포함)의 가장 최신 가격을 가져옴
+
+
+        # --- 현재가 결정 (장전/후 포함 최신가) ---
         curr_price = today_hist['Close'].iloc[-1]
-        prev_close = hist['Close'].iloc[-2] if len(hist) > 1 else curr_price
-        change = ((curr_price - prev_close) / prev_close) * 100 if prev_close != 0 else 0
-        
-        # 기술적 지표
+        prev_close = hist['Close'].iloc[-2]
+        change = ((curr_price - prev_close) / prev_close) * 100
+
+        # --- 기술적 지표 계산 ---
         delta = hist['Close'].diff()
         gain = (delta.where(delta > 0, 0)).rolling(window=14).mean()
         loss = (-delta.where(delta < 0, 0)).rolling(window=14).mean()
         
-        rs = gain.iloc[-1] / loss.iloc[-1] if loss.iloc[-1] != 0 else 0
+        last_gain = gain.iloc[-1]
+        last_loss = loss.iloc[-1]
+        rs = last_gain / last_loss if last_loss != 0 else 0
         rsi = 100 - (100 / (1 + rs))
-        ma5 = hist['Close'].rolling(5).mean().iloc[-1]
-        ma20 = hist['Close'].rolling(window=20).mean().iloc[-1]
         
-        score = 1
+        ma5 = hist['Close'].rolling(5).mean().iloc[-1]
+        ma20 = hist['Close'].rolling(20).mean().iloc[-1]
+
+        # --- 스코어링 시스템 (방식 1 채택) ---
+        score = 0
         reasons = []
+        
         if rsi < 30: score += 3; reasons.append("RSI 과매도")
-        elif rsi > 70: score -= 3; reasons.append("RSI 과매수")
+        elif rsi > 70: score -= 2; reasons.append("RSI 과매수") # 과매수는 주의
+        
         if curr_price > ma5: score += 1; reasons.append("5일선 위")
         if ma5 > ma20: score += 1; reasons.append("정배열")
 
@@ -71,8 +79,8 @@ def analyze_stock(ticker):
             "현재가": price_fmt,
             "등락률": round(change, 2),
             "신호": "매수" if score >= 2 else "매도",
-            "강도": score,
-            "이유": ", ".join(reasons) if reasons else "보통",
+            "강도": max(0, min(score, 5)),
+            "이유": ", ".join(reasons) if reasons else "관망",
             "chart_series": today_hist['Close'] 
         }
     except:
