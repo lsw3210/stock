@@ -28,49 +28,24 @@ def save_settings(tickers):
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
         json.dump(tickers, f, ensure_ascii=False, indent=4)
 
-# 1. 상단에 팝업(Dialog) 함수 정의
-@st.dialog("📈 상세 분석 리포트", width="large")
-def show_stock_details(res):
-    st.subheader(f"{res['종목명']} ({res['티커']})")
-    
-    # Plotly 차트 생성
-    data = res['chart_series']
-    fig = px.line(x=data.index, y=data.values, title="실시간 변동 추이")
-    fig.update_yaxes(autorange=True, fixedrange=False)
-    fig.update_layout(height=400)
-    
-    st.plotly_chart(fig, use_container_width=True)
-    
-    # 상세 정보 출력
-    col1, col2 = st.columns(2)
-    col1.metric("현재가", res['현재가'], f"{res['등락률']}%")
-    col2.write(f"**신호:** {res['신호']} | **강도:** {res['강도']}")
-    st.info(f"**분석 이유:** {res['이유']}")
-    
-    if st.button("닫기"):
-        st.rerun()
-
-
-# --- 분석 로직 ---
+# --- 2. 분석 로직 (방어적 설계) ---
 def analyze_stock(ticker):
     try:
         stock_obj = yf.Ticker(ticker)
+        # 장전/후 포함 5분 단위 데이터 (오늘)
         today_hist = stock_obj.history(period="1d", interval="5m", prepost=True)
+        # 기술적 지표용 1개월 데이터
         hist = stock_obj.history(period="1mo")
         
-        # 조건 완화: 데이터가 하나라도 있으면 일단 분석하도록 수정
-        if today_hist.empty or len(hist) < 2: 
-            return None
+        if today_hist.empty: return None
 
         info = stock_obj.info
         name = info.get('longName') or info.get('shortName') or ticker
-        
-        # 데이터가 20개가 안 될 경우를 대비한 안전한 인덱싱
         curr_price = hist['Close'].iloc[-1]
         prev_close = hist['Close'].iloc[-2] if len(hist) > 1 else curr_price
         change = ((curr_price - prev_close) / prev_close) * 100 if prev_close != 0 else 0
         
-        # 지표 계산 시 데이터 개수 체크
+        # 지표 계산
         ma5 = hist['Close'].rolling(5).mean().iloc[-1] if len(hist) >= 5 else curr_price
         ma20 = hist['Close'].rolling(20).mean().iloc[-1] if len(hist) >= 20 else curr_price
         
@@ -88,85 +63,95 @@ def analyze_stock(ticker):
             "등락률": round(change, 2),
             "신호": "매수" if score >= 2 else "매도",
             "강도": score,
-            "이유": ", ".join(reasons) if reasons else "데이터 부족/보통",
+            "이유": ", ".join(reasons) if reasons else "데이터 분석 완료",
             "chart_series": today_hist['Close'] 
         }
-    except Exception as e:
-        # 로그에 에러를 찍어서 관리자 모드에서 볼 수 있게 함
-        print(f"Error analyzing {ticker}: {e}")
+    except:
         return None
 
-# --- UI 구성 ---
+# --- 3. 팝업창(Dialog) 정의 ---
+@st.dialog("📈 종목 상세 분석", width="large")
+def show_details(res):
+    st.subheader(f"{res['종목명']} ({res['티커']})")
+    
+    # 데이터 인덱스 정리 (시간대 제거)
+    data = res['chart_series'].copy()
+    data.index = data.index.tz_localize(None)
+    
+    # Plotly 차트 생성 (Y축 자동 스케일링 핵심)
+    fig = px.line(x=data.index, y=data.values, title=f"실시간 추이 (장전/후 포함)")
+    fig.update_yaxes(autorange=True, fixedrange=False, title="Price")
+    fig.update_layout(margin=dict(l=10, r=10, t=30, b=10), height=400)
+    
+    st.plotly_chart(fig, use_container_width=True)
+    
+    # 지표 요약
+    c1, c2, c3 = st.columns(3)
+    c1.metric("현재가", res['현재가'])
+    c2.metric("등락률", f"{res['등락률']}%")
+    c3.metric("분석강도", f"{res['강도']}/5")
+    
+    st.write(f"**💡 분석 결과:** {res['이유']}")
+    if st.button("창 닫기"):
+        st.rerun()
+
+# --- 4. 메인 UI 구성 ---
 st.title("📊 AI 주식 분석 시스템")
 
-# 사이드바 설정
+# 사이드바
 st.sidebar.header("⚙️ 종목 설정")
 saved_tickers = load_settings()
-tickers_input = st.sidebar.text_area("분석 티커 목록 (쉼표 또는 줄바꿈 구분)", 
-                                    value="\n".join(saved_tickers), height=400)
+tickers_input = st.sidebar.text_area("분석 티커 목록", value="\n".join(saved_tickers), height=300)
 current_tickers = [t.strip().upper() for t in tickers_input.replace(",", "\n").split("\n") if t.strip()]
 
 if st.sidebar.button("💾 설정 저장"):
     save_settings(current_tickers)
-    st.sidebar.success("설정이 저장되었습니다!")
+    st.sidebar.success("설정 저장 완료!")
 
-# 메인 화면
-if st.button("🚀 실시간 분석 및 차트 로드", use_container_width=True):
+# 분석 실행 버튼
+if st.button("🚀 실시간 분석 및 데이터 로드", use_container_width=True):
     results = []
-    progress_bar = st.progress(0)
-    status_text = st.empty()
+    prog_bar = st.progress(0)
+    status_msg = st.empty()
 
     for i, ticker in enumerate(current_tickers):
-        percent = int((i + 1) / len(current_tickers) * 100)
-        status_text.text(f"⏳ 분석 중: {ticker} ({percent}%)")
-        progress_bar.progress(percent)
+        pct = int((i + 1) / len(current_tickers) * 100)
+        status_msg.text(f"⏳ 분석 중: {ticker} ({pct}%)")
+        prog_bar.progress(pct)
         
         res = analyze_stock(ticker)
-        if res:
-            results.append(res)
+        if res: results.append(res)
+    
+    # 세션에 결과 저장 (클릭 이벤트 대응용)
+    st.session_state['analysis_results'] = results
+    status_msg.success(f"✅ 총 {len(results)}개 종목 분석 완료!")
 
-    # 1. 상단에 팝업(Dialog) 함수 정의
-@st.dialog("📈 상세 분석 리포트", width="large")
-def show_stock_details(res):
-    st.subheader(f"{res['종목명']} ({res['티커']})")
-    
-    # Plotly 차트 생성
-    data = res['chart_series']
-    fig = px.line(x=data.index, y=data.values, title="실시간 변동 추이")
-    fig.update_yaxes(autorange=True, fixedrange=False)
-    fig.update_layout(height=400)
-    
-    st.plotly_chart(fig, use_container_width=True)
-    
-    # 상세 정보 출력
-    col1, col2 = st.columns(2)
-    col1.metric("현재가", res['현재가'], f"{res['등락률']}%")
-    col2.write(f"**신호:** {res['신호']} | **강도:** {res['강도']}")
-    st.info(f"**분석 이유:** {res['이유']}")
-    
-    if st.button("닫기"):
-        st.rerun()
+# 결과 출력
+if 'analysis_results' in st.session_state and st.session_state['analysis_results']:
+    results = st.session_state['analysis_results']
+    df = pd.DataFrame(results)
+    display_df = df.drop(columns=['chart_series'])
 
-    # 2. 메인 화면의 표 출력 부분 수정
-    if results:
-        df = pd.DataFrame(results)
-        display_df = df.drop(columns=['chart_series'])
-        
-        st.info("💡 표에서 분석하고 싶은 종목의 행을 클릭하면 상세 차트가 팝업됩니다.")
-        
-        # on_select="rerun"을 설정하여 클릭 시 앱이 반응하게 합니다.
-        event = st.dataframe(
-            display_df,
-            use_container_width=True,
-            hide_index=True,
-            on_select="rerun", # 클릭 이벤트 활성화
-            selection_mode="single-row" # 한 줄씩만 선택
-        )
+    st.info("💡 표에서 종목을 클릭하면 상세 차트가 팝업됩니다.")
 
-        # 3. 행 클릭 시 팝업 실행
-        if event.selection.rows:
-            selected_idx = event.selection.rows[0]
-            selected_res = results[selected_idx]
-            show_stock_details(selected_res)
-    else:
-        st.error("분석 결과가 없습니다. 티커를 확인해 주세요.")
+    # 표 출력 및 선택 이벤트 감지
+    selection = st.dataframe(
+        display_df,
+        use_container_width=True,
+        hide_index=True,
+        on_select="rerun",
+        selection_mode="single-row",
+        column_config={
+            "등락률": st.column_config.NumberColumn("등락률(%)", format="%.2f%%"),
+            "강도": st.column_config.ProgressColumn("강도", min_value=0, max_value=5),
+        }
+    )
+
+    # 행 선택 시 팝업 띄우기
+    if selection.selection.rows:
+        selected_row_idx = selection.selection.rows[0]
+        show_details(results[selected_row_idx])
+else:
+    st.write("분석 버튼을 눌러주세요.")
+    # else:
+    #     st.error("분석 결과가 없습니다. 티커를 확인해 주세요.")
