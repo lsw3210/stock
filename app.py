@@ -1,6 +1,8 @@
 # https://hitstock.streamlit.app
+# pip freeze > requirements.txt
 
 import streamlit as st
+from streamlit_autorefresh import st_autorefresh # 라이브러리 추가
 import yfinance as yf
 import pandas as pd
 import json
@@ -13,6 +15,10 @@ DEFAULT_TICKERS = [
     "BITX", "GOOGL", "INTC", "SNDK", "SOXL", "MSFT", "AAPL", "NVDA", "TSLA", "META", "AMZN", "WDC",
     "005930.KS", "000660.KS", "035420.KS", "051910.KS", "068270.KS", "105560.KS", "323410.KS", "207940.KS"
 ]
+
+# --- 자동 새로고침 설정 (60초마다) ---
+# count는 새로고침될 때마다 1씩 증가하며, 이 변수를 통해 리프레시 횟수를 확인할 수 있습니다.
+count = st_autorefresh(interval=60000, limit=100, key="fscounter")
 
 st.set_page_config(page_title="AI 주식 분석 시스템", layout="wide")
 
