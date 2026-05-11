@@ -120,6 +120,7 @@ def show_details(res):
 
 # --- 4. 메인 UI 구성 ---
 st.title("📊 AI 주식 분석 시스템")
+st.write(f"🔄 마지막 갱신 횟수: {count}")
 
 # 사이드바
 st.sidebar.header("⚙️ 종목 설정")
