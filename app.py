@@ -83,8 +83,14 @@ def analyze_stock(ticker):
         }
     except:
         return None
+    
+# 1. 세션 상태 초기화
+if 'selected_ticker' not in st.session_state:
+    st.session_state['selected_ticker'] = None
 
-# --- 3. 팝업창(Dialog) 정의 ---
+
+# 2. 다이얼로그 함수 내부 수정
+## --- 3. 팝업창(Dialog) 정의 ---
 @st.dialog("📈 상세 차트 분석", width="large")
 def show_details(res):
     st.subheader(f"{res['종목명']} ({res['티커']})")
@@ -100,6 +106,7 @@ def show_details(res):
     st.plotly_chart(fig, use_container_width=True)
     st.write(f"**현재 분석 상태:** {res['이유']}")
     if st.button("닫기", use_container_width=True):
+        st.session_state['selected_ticker'] = None # 선택 상태 초기화
         st.rerun()
 
 # --- 4. 메인 UI 구성 ---
@@ -137,10 +144,9 @@ if results:
 
     # 표 출력 (모바일 틀 고정 및 가독성 설정)
     selection = st.dataframe(
-        display_df,
-        use_container_width=True,
-        hide_index=True,
+        df,
         on_select="rerun",
+        key="stock_df", # 고유 키 부여
         selection_mode="single-row",
         column_config={
             "티커": st.column_config.TextColumn("티커", pinned=True), # 왼쪽 고정
@@ -153,6 +159,8 @@ if results:
     # 행 선택 시 팝업 띄우기
     if selection.selection.rows:
         selected_idx = selection.selection.rows[0]
+        # 이전 선택과 다를 때만 업데이트하거나 팝업을 유지
+        current_res = results[selected_idx]
         show_details(results[selected_idx])
 else:
     st.warning("분석할 수 있는 데이터가 없습니다. 티커를 확인해 주세요.")
