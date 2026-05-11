@@ -91,21 +91,16 @@ def analyze_stock(ticker):
 def show_details(res):
     st.subheader(f"{res['종목명']} ({res['티커']})")
     
-    with st.expander(f"🔍 {res['티커']} 상세 분석"):
-        data = res['chart_series'].copy()
-        
-        # 1. 한국 시간(Asia/Seoul)으로 변환
-        data.index = data.index.tz_convert('Asia/Seoul')
-        
-        # 2. Plotly 차트 생성 시 시간 포맷 지정
-        fig = px.line(x=data.index, y=data.values, title="실시간 추이 (한국 시간 기준)")
-        
-        # X축 눈금을 1시간 단위로, '09:00' 형식으로 표시
-        fig.update_xaxes(
-            dtick=3600000, # 1시간(밀리초)
-            tickformat="%H:%M\n%m/%d"
-        )
-        st.plotly_chart(fig, use_container_width=True)
+    # 데이터 인덱스 정리 (시간대 제거)
+    data = res['chart_series'].copy()
+    data.index = data.index.tz_localize(None)
+    
+    # Plotly 차트 생성 (Y축 자동 스케일링 핵심)
+    fig = px.line(x=data.index, y=data.values, title=f"실시간 추이 (장전/후 포함)")
+    fig.update_yaxes(autorange=True, fixedrange=False, title="Price")
+    fig.update_layout(margin=dict(l=10, r=10, t=30, b=10), height=400)
+    
+    st.plotly_chart(fig, use_container_width=True)
     
     # 지표 요약
     c1, c2, c3 = st.columns(3)
