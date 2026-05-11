@@ -89,6 +89,8 @@ def analyze_stock(ticker):
 # --- 3. 팝업창(Dialog) 정의 ---
 @st.dialog("📈 종목 상세 분석", width="large")
 def show_details(res):
+    st.subheader(f"{res['종목명']} ({res['티커']})")
+    
     with st.expander(f"🔍 {res['티커']} 상세 분석"):
         data = res['chart_series'].copy()
         
