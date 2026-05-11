@@ -8,6 +8,7 @@ import pandas as pd
 import json
 import os
 import plotly.express as px
+from datetime import datetime # 시간 라이브러리 추가
 
 # --- 설정 및 초기화 ---
 CONFIG_FILE = "stock_config.json"
@@ -15,6 +16,10 @@ DEFAULT_TICKERS = [
     "BITX", "GOOGL", "INTC", "SNDK", "SOXL", "MSFT", "AAPL", "NVDA", "TSLA", "META", "AMZN", "WDC",
     "005930.KS", "000660.KS", "035420.KS", "051910.KS", "068270.KS", "105560.KS", "323410.KS", "207940.KS"
 ]
+
+# --- 현재 시각 포맷팅 ---
+# "05월 11일 18:25" 형식으로 변환
+now = datetime.now().strftime("%m월 %d일 %H:%M")
 
 # --- 자동 새로고침 설정 (60초마다) ---
 # count는 새로고침될 때마다 1씩 증가하며, 이 변수를 통해 리프레시 횟수를 확인할 수 있습니다.
@@ -120,7 +125,7 @@ def show_details(res):
 
 # --- 4. 메인 UI 구성 ---
 st.title("📊 AI 주식 분석 시스템")
-st.write(f"🔄 마지막 갱신 횟수: {count}")
+st.write(f"🔄 **최근 갱신 시각:** {now}")
 
 # 사이드바
 st.sidebar.header("⚙️ 종목 설정")
