@@ -144,7 +144,7 @@ if results:
 
     # 표 출력 (모바일 틀 고정 및 가독성 설정)
     selection = st.dataframe(
-        df,
+        display_df,
         on_select="rerun",
         key="stock_df", # 고유 키 부여
         selection_mode="single-row",
