@@ -95,19 +95,30 @@ if 'selected_ticker' not in st.session_state:
 def show_details(res):
     st.subheader(f"{res['종목명']} ({res['티커']})")
     
+    # 1. 데이터 복사 및 타임존 변환
     data = res['chart_series'].copy()
     data.index = data.index.tz_convert('Asia/Seoul')
     
-    fig = px.line(x=data.index, y=data.values, title="실시간 가격 추이 (한국 시간)")
+    # 2. 최근 2시간 데이터만 필터링 (핵심 로직 추가)
+    # 현재 서울 시각 기준으로 2시간 전 시점을 계산합니다.
+    now_seoul_dt = datetime.now(pytz.timezone('Asia/Seoul'))
+    two_hours_ago = now_seoul_dt - pd.Timedelta(hours=2)
     
-    # --- 핵심 수정 부분 ---
+    # 계산된 시점 이후의 데이터만 추출합니다.
+    filtered_data = data[data.index >= two_hours_ago]
+    
+    # 만약 최근 2시간 데이터가 너무 적다면 최소 20개는 보여주도록 예외처리할 수 있습니다.
+    if len(filtered_data) < 20:
+        filtered_data = data.tail(30) # 데이터가 부족하면 그냥 마지막 30개를 보여줌
+
+    # 3. 차트 생성 (필터링된 데이터 사용)
+    fig = px.line(x=filtered_data.index, y=filtered_data.values, title="실시간 가격 추이 (최근 2시간)")
+    
     fig.update_xaxes(
         tickformat="%H:%M",       # 시:분 형식
-        dtick=60000,              # 눈금 간격을 1분(60,000ms)으로 강제 고정
-        tickangle=-45,            # 글자가 겹칠 수 있으므로 약간 기울임
+        dtick=600000,             # 눈금 간격 10분(600,000ms) - 1분은 너무 촘촘하여 10분 권장
         title="시간"
     )
-    # -----------------------
     
     fig.update_yaxes(autorange=True, fixedrange=False, title="가격")
     fig.update_layout(height=400, margin=dict(l=10, r=10, t=30, b=10))
