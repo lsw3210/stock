@@ -99,15 +99,18 @@ def show_details(res):
     data.index = data.index.tz_convert('Asia/Seoul') # 한국 시간으로 변환
     
     fig = px.line(x=data.index, y=data.values, title="실시간 가격 추이 (한국 시간)")
-    fig.update_yaxes(autorange=True, fixedrange=False, title="Price")
-    fig.update_xaxes(tickformat="%H:%M", title="시간")
+    fig.update_xaxes(
+        tickformat="%H:%M", # 차트 밑에 '15:30' 처럼 시간 표시
+        title="시간"
+    )
+    fig.update_yaxes(autorange=True, fixedrange=False, title="가격")
     fig.update_layout(height=400, margin=dict(l=10, r=10, t=30, b=10))
     
     st.plotly_chart(fig, use_container_width=True)
     st.write(f"**현재 분석 상태:** {res['이유']}")
-    if st.button("닫기", use_container_width=True):
-        st.session_state['selected_ticker'] = None # 선택 상태 초기화
-        st.rerun()
+    # if st.button("닫기", use_container_width=True):
+    #     st.session_state['selected_ticker'] = None # 선택 상태 초기화
+    #     st.rerun()
 
 # --- 4. 메인 UI 구성 ---
 st.title("📊 AI 주식 분석 시스템")
