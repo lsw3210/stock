@@ -41,7 +41,7 @@ def analyze_stock(ticker):
     try:
         stock_obj = yf.Ticker(ticker)
         # 실시간성 확보를 위해 prepost=True 사용
-        today_hist = stock_obj.history(period="1d", interval="5m", prepost=True)
+        today_hist = stock_obj.history(period="1d", interval="1m", prepost=True)
         hist = stock_obj.history(period="1mo")
         
         if today_hist.empty or len(hist) < 20: return None
@@ -96,13 +96,19 @@ def show_details(res):
     st.subheader(f"{res['종목명']} ({res['티커']})")
     
     data = res['chart_series'].copy()
-    data.index = data.index.tz_convert('Asia/Seoul') # 한국 시간으로 변환
+    data.index = data.index.tz_convert('Asia/Seoul')
     
     fig = px.line(x=data.index, y=data.values, title="실시간 가격 추이 (한국 시간)")
+    
+    # --- 핵심 수정 부분 ---
     fig.update_xaxes(
-        tickformat="%H:%M", # 차트 밑에 '15:30' 처럼 시간 표시
+        tickformat="%H:%M",       # 시:분 형식
+        dtick=60000,              # 눈금 간격을 1분(60,000ms)으로 강제 고정
+        tickangle=-45,            # 글자가 겹칠 수 있으므로 약간 기울임
         title="시간"
     )
+    # -----------------------
+    
     fig.update_yaxes(autorange=True, fixedrange=False, title="가격")
     fig.update_layout(height=400, margin=dict(l=10, r=10, t=30, b=10))
     
