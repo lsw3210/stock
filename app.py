@@ -14,7 +14,7 @@ DEFAULT_TICKERS = [
     "BITX", "GOOGL", "INTC", "SNDK", "SOXL", "MSFT", "AAPL", "NVDA", "TSLA", "META", "AMZN", "WDC",
     "005930.KS", "000660.KS", "035420.KS", "051910.KS", "068270.KS", "105560.KS", "323410.KS", "207940.KS"
 ]
- 
+
 st.set_page_config(page_title="AI 주식 분석 시스템", layout="wide")
 
 # 자동 새로고침 설정 (60초 = 60000ms)
@@ -135,7 +135,9 @@ st.write(f"🔄 **데이터 최근 갱신 (서울):** {now_seoul}")
 
 # 사이드바 설정
 st.sidebar.header("⚙️ 종목 설정")
-saved_tickers = load_settings()
+# saved_tickers = load_settings()
+saved_tickers = DEFAULT_TICKERS
+
 tickers_input = st.sidebar.text_area("분석 티커 목록", value="\n".join(saved_tickers), height=300)
 current_tickers = [t.strip().upper() for t in tickers_input.replace(",", "\n").split("\n") if t.strip()]
 
