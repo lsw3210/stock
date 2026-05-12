@@ -11,8 +11,8 @@ from streamlit_autorefresh import st_autorefresh
 # --- 1. 설정 및 초기화 ---
 CONFIG_FILE = "stock_config.json"
 DEFAULT_TICKERS = [
-    "BITX", "BTC-USD", "NVDA", "TSLA", "AAPL", "SOXL", "GOOGL", "MSFT",
-    "005930.KS", "000660.KS", "035420.KS", "051910.KS"
+    "BITX", "GOOGL", "INTC", "SNDK", "SOXL", "MSFT", "AAPL", "NVDA", "TSLA", "META", "AMZN", "WDC",
+    "005930.KS", "000660.KS", "035420.KS", "051910.KS", "068270.KS", "105560.KS", "323410.KS", "207940.KS"
 ]
 
 st.set_page_config(page_title="AI 주식 분석 시스템", layout="wide")
