@@ -135,8 +135,8 @@ st.write(f"🔄 **데이터 최근 갱신 (서울):** {now_seoul}")
 
 # 사이드바 설정
 st.sidebar.header("⚙️ 종목 설정")
-# saved_tickers = load_settings()
-saved_tickers = DEFAULT_TICKERS
+saved_tickers = load_settings()
+# saved_tickers = DEFAULT_TICKERS
 
 tickers_input = st.sidebar.text_area("분석 티커 목록", value="\n".join(saved_tickers), height=300)
 current_tickers = [t.strip().upper() for t in tickers_input.replace(",", "\n").split("\n") if t.strip()]
