@@ -40,16 +40,23 @@ def save_settings(tickers):
 def analyze_stock(ticker):
     try:
         stock_obj = yf.Ticker(ticker)
-        # 실시간성 확보를 위해 prepost=True 사용
+        # 1. 일단 데이터 가져오기
         today_hist = stock_obj.history(period="1d", interval="5m", prepost=True)
-        hist = stock_obj.history(period="5d")
-        
-        if today_hist.empty or len(hist) < 20: return None
+        hist = stock_obj.history(period="5d") # 검증용은 5일치면 충분
 
-        # 실시간 현재가 (가장 최신 데이터 행)
-        curr_price = today_hist['Close'].iloc[-1]
-        prev_close = hist['Close'].iloc[-2]
-        change = ((curr_price - prev_close) / prev_close) * 100
+        # 2. 데이터가 완전히 없는 경우만 리턴 (조건 완화)
+        if hist.empty: 
+            return None
+
+        # 3. 실시간 데이터가 비어있다면(장외 시간 등), 최근 5일 데이터에서 마지막 값을 가져옴
+        if today_hist.empty:
+            curr_price = hist['Close'].iloc[-1]
+            change = 0.0 # 장 닫힘 상태
+            chart_data = hist['Close'] # 차트도 주간 차트로 대체
+        else:
+            curr_price = today_hist['Close'].iloc[-1]
+            prev_close = hist['Close'].iloc[-2]
+            change = ((curr_price - prev_close) / prev_close) * 100
         
         # 기술적 지표 (RSI, MA)
         delta = hist['Close'].diff()
