@@ -41,8 +41,8 @@ def analyze_stock(ticker):
     try:
         stock_obj = yf.Ticker(ticker)
         # 실시간성 확보를 위해 prepost=True 사용
-        today_hist = stock_obj.history(period="1d", interval="1m", prepost=True)
-        hist = stock_obj.history(period="1mo")
+        today_hist = stock_obj.history(period="1d", interval="5m", prepost=True)
+        hist = stock_obj.history(period="5d")
         
         if today_hist.empty or len(hist) < 20: return None
 
