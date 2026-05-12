@@ -14,7 +14,7 @@ DEFAULT_TICKERS = [
     "BITX", "GOOGL", "INTC", "SNDK", "SOXL", "MSFT", "AAPL", "NVDA", "TSLA", "META", "AMZN", "WDC",
     "005930.KS", "000660.KS", "035420.KS", "051910.KS", "068270.KS", "105560.KS", "323410.KS", "207940.KS"
 ]
-
+ 
 st.set_page_config(page_title="AI 주식 분석 시스템", layout="wide")
 
 # 자동 새로고침 설정 (60초 = 60000ms)
