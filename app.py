@@ -149,11 +149,20 @@ def run_analysis():
     for ticker in current_tickers:
         res = analyze_stock(ticker)
         if res: results.append(res)
+        else:
+            # 원인 파악을 위한 출력
+            st.error(f"❌ {ticker}: 데이터를 가져오는 데 실패했거나 조건(데이터량 등) 미달입니다.")
     return results
 
 # 새로고침마다 데이터를 강제로 새로 가져옴
 results = run_analysis()
-st.session_state['analysis_results'] = results
+if not results:
+    st.warning("분석 결과가 없습니다. 아래 사항을 확인하세요:")
+    st.write("- 티커 이름이 정확한가요? (예: NVDA, 005930.KS)")
+    st.write("- 현재 시장이 열려 있거나 최근 거래 기록이 있나요?")
+    st.write("- 인터넷 연결 상태나 API 차단 여부를 확인하세요.")
+else:
+    st.session_state['analysis_results'] = results
 
 # 결과 출력
 if results:
